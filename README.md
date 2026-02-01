@@ -2,6 +2,33 @@
 
 Minimal FastAPI backend for voice workflow webhook endpoints.
 
+## Quick start (get everything running)
+
+**Option A — Docker (recommended):**
+
+1. Clone the repo and go to the project root.
+2. Copy the env example and add your keys (see [Secrets](#secrets-what-you-need)):
+   ```bash
+   cp .env.example .env
+   ```
+3. Start backend + dashboard:
+   ```bash
+   docker compose up --build
+   ```
+4. Open **http://localhost:5173** in your browser. Use the header to switch **Demo** (offline data) or **Live** (API data).
+
+**Option B — Local dev (backend + frontend in two terminals):**
+
+1. Backend: from project root, `cp .env.example .env`, edit `.env`, then `python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`.
+2. Frontend: `cd frontend`, `npm install`, `cp .env.example .env` (set `VITE_API_BASE_URL=http://localhost:8000`), then `npm run dev`.
+3. Open **http://localhost:5173**.
+
+**Secrets (what you need):**
+
+- **API_KEY** — Any string you choose; used to protect webhook/API calls. Default `devkey123` is fine for local/demo. Not shared with third parties; keep it private in production.
+- **FMCSA_WEBKEY** — The only key you get from an external service. Sign up at [FMCSA QCMobile](https://mobile.fmcsa.dot.gov/QCDevsite/login) to get a WebKey for real MC verification. If you omit it, the app still runs; `/verify_mc` will return "FMCSA_WEBKEY not configured" and you can use Demo Mode or mock flows.
+- **SMTP_*** — Optional; only needed if you want the backend to send handoff emails. Otherwise use the workflow "Send Email" step with the API response.
+
 ## Project Structure
 
 ```
