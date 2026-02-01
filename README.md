@@ -102,9 +102,6 @@ cp .env.example .env
 ```
 
 Then edit `.env` and add your API keys:
-```bash
-API_KEY=devkey123
-FMCSA_WEBKEY=your-actual-fmcsa-webkey-here
 ```
 
 **Option B: Export in terminal**
