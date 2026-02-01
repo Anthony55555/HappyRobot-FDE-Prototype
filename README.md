@@ -98,11 +98,15 @@ pip install -r requirements.txt
 
 Copy the example file and edit it with your values:
 ```bash
+
 cp .env.example .env
 ```
 
 Then edit `.env` and add your API keys:
 ```
+```bash
+API_KEY=devkey123
+FMCSA_WEBKEY=your-actual-fmcsa-webkey-here
 
 **Option B: Export in terminal**
 
