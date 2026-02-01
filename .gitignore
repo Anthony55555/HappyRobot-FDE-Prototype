@@ -27,3 +27,7 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+# Cloned repo folders (don't commit these)
+HappyRobot-FDE-Prototype/
+happyrobot-carrier-dashboard/
