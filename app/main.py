@@ -468,6 +468,12 @@ def _build_call_record(call_id: str):
     fmcsa_verified = eligible is True
     verification_status = "failed" if eligible is False else ("verified" if eligible is True else "pending")
     neg = (by_type.get("negotiation_complete") or {}).get("payload") or {}
+    if not neg and by_type.get("call_completed"):
+        neg = _payload_as_dict((by_type.get("call_completed") or {}).get("payload"))
+    if not neg and by_type.get("log_event"):
+        _le = _payload_as_dict((by_type.get("log_event") or {}).get("payload"))
+        if _le and (_le.get("load_id") or _le.get("origin") or _le.get("accepted") is not None):
+            neg = _le
     best_load = (by_type.get("best_load_retrieved") or {}).get("payload") or {}
     load_data = neg if neg.get("load_id") or neg.get("origin") else best_load
     load_matched = None
@@ -479,7 +485,7 @@ def _build_call_record(call_id: str):
             "pickup_datetime": load_data.get("pickup_datetime") or "",
             "delivery_datetime": load_data.get("delivery_datetime") or "",
             "equipment_type": load_data.get("equipment_type") or "Van",
-            "loadboard_rate": safe_number_convert(load_data.get("loadboard_rate") or load_data.get("rate")) or 0,
+            "loadboard_rate": safe_number_convert(load_data.get("loadboard_rate") or load_data.get("rate") or load_data.get("original_rate")) or 0,
             "weight": safe_number_convert(load_data.get("weight")) or 0,
             "commodity_type": load_data.get("commodity_type") or load_data.get("commodity") or "",
             "miles": safe_number_convert(load_data.get("miles")) or 0,
@@ -503,17 +509,43 @@ def _build_call_record(call_id: str):
         fallback_rate = negotiation.get("initial_offer") or negotiation.get("final_rate")
         if fallback_rate is not None and fallback_rate > 0:
             load_matched["loadboard_rate"] = fallback_rate
-    if not fmcsa_verified and eligible is False:
+    # Normalize so we always have dicts (handles payload stored as double-encoded JSON string)
+    sentiment_row = _payload_as_dict((by_type.get("sentiment_classified") or {}).get("payload"))
+    classified_row = _payload_as_dict((by_type.get("call_classified") or {}).get("payload"))
+    if not classified_row and by_type.get("call_completed"):
+        classified_row = _payload_as_dict((by_type.get("call_completed") or {}).get("payload"))
+    if not classified_row and by_type.get("log_event"):
+        _le = _payload_as_dict((by_type.get("log_event") or {}).get("payload"))
+        if _le and (_le.get("load_id") or _le.get("origin") or _le.get("accepted") is not None):
+            classified_row = _le
+    # Outcome: prefer explicit outcome from call_classified/call_completed, else derive from neg/verification
+    _explicit_outcome = (classified_row or {}).get("outcome")
+    if _explicit_outcome and str(_explicit_outcome).strip().lower() in ("booked", "declined", "no_match", "transferred", "abandoned", "failed_verification"):
+        outcome = str(_explicit_outcome).strip().lower()
+    elif not fmcsa_verified and eligible is False:
         outcome = "failed_verification"
     elif not neg:
-        outcome = "dropped"
+        # No negotiation payload: check if call_completed/classified says accepted
+        _accepted = (classified_row or {}).get("accepted")
+        if _accepted in (True, "true", "True") and (load_matched or classified_row):
+            outcome = "booked"
+            # Build minimal negotiation from classified_row so Final Rate / Rounds show in UI
+            if not negotiation and classified_row:
+                _fr = safe_number_convert(classified_row.get("final_price") or classified_row.get("final_rate"))
+                _rnd = classified_row.get("negotiation_rounds")
+                if _rnd is not None and not isinstance(_rnd, int):
+                    try:
+                        _rnd = int(_rnd)
+                    except (ValueError, TypeError):
+                        _rnd = 0
+                _lb = safe_number_convert(classified_row.get("original_rate") or classified_row.get("loadboard_rate")) or (load_matched or {}).get("loadboard_rate") or 0
+                negotiation = {"rounds": _rnd or 0, "initial_offer": _lb or 0, "counter_offers": [], "final_rate": _fr, "agreed": True}
+        else:
+            outcome = "dropped"
     elif accepted:
         outcome = "booked"
     else:
         outcome = "no_deal"
-    # Normalize so we always have dicts (handles payload stored as double-encoded JSON string)
-    sentiment_row = _payload_as_dict((by_type.get("sentiment_classified") or {}).get("payload"))
-    classified_row = _payload_as_dict((by_type.get("call_classified") or {}).get("payload"))
     sentiment = _normalize_sentiment(
         sentiment_row.get("sentiment_classification")
         or sentiment_row.get("sentiment")

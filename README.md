@@ -29,6 +29,21 @@ Minimal FastAPI backend for voice workflow webhook endpoints.
 - **FMCSA_WEBKEY** — The only key you get from an external service. Sign up at [FMCSA QCMobile](https://mobile.fmcsa.dot.gov/QCDevsite/login) to get a WebKey for real MC verification. If you omit it, the app still runs; `/verify_mc` will return "FMCSA_WEBKEY not configured" and you can use Demo Mode or mock flows.
 - **SMTP_*** — Optional; only needed if you want the backend to send handoff emails. Otherwise use the workflow "Send Email" step with the API response.
 
+## Workflow webhook: "Endpoint is offline" (ngrok)
+
+If your workflow (e.g. HappyRobot) shows **"The endpoint … ngrok-free.dev is offline"** or **ERR_NGROK_3200**:
+
+1. **Start the backend** (so ngrok has something to tunnel to):
+   ```bash
+   python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+2. **Start ngrok** in another terminal and expose port 8000:
+   ```bash
+   ngrok http 8000
+   ```
+3. **Update the workflow** so every webhook uses the **current** ngrok URL (e.g. `https://xxxx-xx-xx-xx.ngrok-free.app`). Free ngrok URLs change each time you restart ngrok.
+4. **Fix empty `call_id`**: The "Send MC number and validate" (or any) step must receive `call_id` from the **Get Data** step. In the webhook config, set the request body field `call_id` to the variable that holds the output of Get Data → `call_id` (e.g. `{{Get Data.call_id}}` or your platform’s equivalent). If `call_id` is empty, events are logged under `"unknown"` and won’t group correctly in the dashboard.
+
 ## Project Structure
 
 ```
